@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drafts</title>
+<style>
+:root{--ink:#1d2433;--mute:#667085;--line:#d9dee7;--bg:#eef1f5;--accent:#2b4fd8;--shared:#b4580a}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);height:100vh;display:flex;flex-direction:column}
+button,select,input{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}button:focus-visible,select:focus-visible,input:focus-visible,#editor:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line)}
+header b{font-size:17px;letter-spacing:.2px}
+main{flex:1;display:flex;min-height:0}
+aside{width:290px;background:#fff;border-right:1px solid var(--line);padding:12px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+aside h3{margin:14px 0 4px;font-size:13px;color:var(--mute);font-weight:600}
+.hint{font-size:12px;color:var(--mute)}
+.item{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border-color:transparent}
+.item.on{background:#e8edff;border-color:var(--accent)}
+.tag{font-size:11px;border-radius:10px;padding:1px 8px;white-space:nowrap;align-self:center}
+.tag.owner{background:#e6f3ec;color:#17603a}.tag.editor,.tag.viewer{background:#fdf0e1;color:var(--shared)}
+section{flex:1;display:flex;flex-direction:column;min-width:0}
+#bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid var(--line)}
+#title{flex:1;min-width:160px;font-size:18px;font-weight:600;border:1px solid transparent;border-radius:6px;padding:4px 8px;background:transparent}
+#title:hover,#title:focus{border-color:var(--line);background:#fff}
+#status{font-size:12px;color:var(--mute);min-width:70px}
+#tools{display:flex;gap:4px;padding:6px 16px;background:#fff;border-bottom:1px solid var(--line)}
+#scroll{flex:1;overflow:auto;padding:24px 12px}
+#editor{max-width:760px;min-height:100%;margin:0 auto;background:#fff;padding:56px 64px;border:1px solid var(--line);border-radius:4px;font:17px/1.65 Georgia,"Times New Roman",serif}
+#editor h1{font-size:28px;margin:.6em 0 .3em}#editor h2{font-size:22px;margin:.6em 0 .3em}
+#empty{margin:auto;color:var(--mute);text-align:center}
+#banner{display:none;background:#fdf0e1;color:var(--shared);padding:6px 16px;font-size:13px}
+#share{display:none;position:absolute;right:16px;top:112px;width:300px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+#share .row{display:flex;gap:6px;margin:6px 0}#share select{flex:1}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#7a1f1f;color:#fff;padding:8px 14px;border-radius:6px;display:none}
+@media(max-width:700px){main{flex-direction:column}aside{width:100%;max-height:34vh}#editor{padding:24px 18px}}
+</style></head><body>
+<header><b>Drafts</b><label>Signed in as <select id="user" aria-label="Switch user"></select></label></header>
+<main>
+<aside>
+ <button class="primary" id="new">New document</button>
+ <button id="importBtn">Import file</button>
+ <input type="file" id="file" accept=".txt,.md,.docx" hidden>
+ <div class="hint">Import supports .txt, .md and .docx up to 5 MB. Each file becomes a new document.</div>
+ <h3>My documents</h3><div id="mine"></div>
+ <h3>Shared with me</h3><div id="shared"></div>
+</aside>
+<section>
+ <div id="empty">Select a document, create a new one, or import a file.</div>
+ <div id="doc" style="display:none;flex:1;flex-direction:column;min-height:0">
+  <div id="bar"><input id="title" aria-label="Document title" maxlength="120"><span id="status"></span><button id="shareBtn">Share</button></div>
+  <div id="banner"></div>
+  <div id="tools" role="toolbar" aria-label="Formatting">
+   <button data-c="bold" title="Bold (Ctrl+B)"><b>B</b></button><button data-c="italic" title="Italic (Ctrl+I)"><i>I</i></button><button data-c="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+   <button data-b="h1">Heading</button><button data-b="h2">Subheading</button><button data-b="p">Body</button>
+   <button data-c="insertUnorderedList">• List</button><button data-c="insertOrderedList">1. List</button>
+  </div>
+  <div id="scroll"><div id="editor" contenteditable="true" aria-label="Document body"></div></div>
+ </div>
+</section></main>
+<div id="share"><b>Share this document</b>
+ <div class="row"><select id="shUser" aria-label="Person"></select><select id="shRole" aria-label="Access"><option value="editor">Can edit</option><option value="viewer">Can view</option></select></div>
+ <button id="shAdd" class="primary">Give access</button><div id="shList" style="margin-top:8px"></div></div>
+<div id="toast" role="alert"></div>
+<script>
+const $=id=>document.getElementById(id);let users=[],cur=null,timer=null,dirty=false;
+const me=()=>$('user').value;
+async function api(url,opt={}){
+ const r=await fetch('/api'+url,{...opt,headers:{'x-user':me(),...(opt.body&&typeof opt.body==='string'?{'content-type':'application/json'}:{}),...opt.headers}});
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Something went wrong.');return j}
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3500)}
+const guard=f=>async(...a)=>{try{await f(...a)}catch(e){toast(e.message)}};
+const name=id=>users.find(u=>u.id===id)?.name||id;
+async function list(){
+ const docs=await api('/docs');
+ const row=d=>{const b=document.createElement('button');b.className='item'+(cur&&cur.id===d.id?' on':'');
+  const t=document.createElement('span');t.textContent=d.title;const g=document.createElement('span');
+  g.className='tag '+(d.role==='owner'?'owner':d.role);g.textContent=d.role==='owner'?'Owner':`${d.role==='editor'?'Can edit':'View only'} · ${name(d.owner).split(' ')[0]}`;
+  b.append(t,g);b.onclick=guard(()=>open(d.id));return b};
+ for(const [el,f,msg] of [[$('mine'),d=>d.role==='owner','No documents yet.'],[$('shared'),d=>d.role!=='owner','Nothing shared with you yet.']]){
+  el.replaceChildren();const rows=docs.filter(f);if(!rows.length){el.innerHTML='<div class="hint"></div>';el.firstChild.textContent=msg}else rows.forEach(d=>el.append(row(d)))}
+}
+async function flush(){clearTimeout(timer);if(!dirty||!cur)return;dirty=false;$('status').textContent='Saving…';
+ try{await api('/docs/'+cur.id,{method:'PUT',body:JSON.stringify({title:$('title').value,content:$('editor').innerHTML})});$('status').textContent='Saved';list()}
+ catch(e){dirty=true;$('status').textContent='Not saved';toast(e.message)}}
+function touch(){if(cur.role==='viewer')return;dirty=true;$('status').textContent='Editing…';clearTimeout(timer);timer=setTimeout(flush,800)}
+async function open(id){await flush();const d=await api('/docs/'+id);cur=d;
+ $('empty').style.display='none';$('doc').style.display='flex';$('title').value=d.title;$('editor').innerHTML=d.content;
+ const ro=d.role==='viewer';$('editor').contentEditable=!ro;$('title').readOnly=d.role==='viewer';$('tools').style.display=ro?'none':'flex';
+ $('shareBtn').style.display=d.role==='owner'?'':'none';$('share').style.display='none';$('status').textContent='';
+ $('banner').style.display=d.role==='owner'?'none':'block';$('banner').textContent=`Shared by ${name(d.owner)} — ${ro?'you can view but not edit':'you can edit'}.`;list()}
+function renderShare(){const l=$('shList');l.replaceChildren();(cur.shares||[]).forEach(s=>{const r=document.createElement('div');r.className='row';
+ const t=document.createElement('span');t.style.flex=1;t.textContent=`${name(s.user)} (${s.role==='editor'?'edit':'view'})`;
+ const x=document.createElement('button');x.textContent='Remove';x.onclick=guard(async()=>{await api(`/docs/${cur.id}/share/${s.user}`,{method:'DELETE'});await open(cur.id);$('share').style.display='block';renderShare()});r.append(t,x);l.append(r)})}
+$('editor').oninput=touch;$('title').oninput=touch;
+document.querySelectorAll('#tools button').forEach(b=>{b.onmousedown=e=>e.preventDefault();b.onclick=()=>{
+ if(b.dataset.c)document.execCommand(b.dataset.c);else document.execCommand('formatBlock',false,b.dataset.b);touch()}});
+$('new').onclick=guard(async()=>{await flush();const {id}=await api('/docs',{method:'POST',body:'{}'});await open(id);$('title').select()});
+$('importBtn').onclick=()=>$('file').click();
+$('file').onchange=guard(async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;await flush();
+ const {id}=await api('/import?name='+encodeURIComponent(f.name),{method:'POST',body:f,headers:{'content-type':'application/octet-stream'}});await open(id)});
+$('shareBtn').onclick=()=>{const s=$('share');s.style.display=s.style.display==='block'?'none':'block';
+ $('shUser').innerHTML='';users.filter(u=>u.id!==me()).forEach(u=>$('shUser').add(new Option(u.name,u.id)));renderShare()};
+$('shAdd').onclick=guard(async()=>{await api(`/docs/${cur.id}/share`,{method:'POST',body:JSON.stringify({user:$('shUser').value,role:$('shRole').value})});
+ await open(cur.id);$('share').style.display='block';renderShare()});
+$('user').onchange=guard(async()=>{await flush();localStorage.user=me();cur=null;$('doc').style.display='none';$('empty').style.display='';$('share').style.display='none';await list()});
+addEventListener('beforeunload',e=>{if(dirty){e.preventDefault()}});
+(async()=>{try{users=await (await fetch('/api/users')).json();users.forEach(u=>$('user').add(new Option(u.name,u.id)));
+ if(localStorage.user)$('user').value=localStorage.user;await list()}catch(e){toast(e.message)}})();
+</script></body></html>
