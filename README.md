@@ -31,5 +31,5 @@ Mocked auth: pick a seeded user in the header dropdown (**Alice Chen, Bob Okafor
 No real-time co-editing (last write wins), no real authentication, no version history, no delete. `node:sqlite` prints an experimental warning on Node 22.
 
 ## Deploy
-Render’s free tier there’s no persistent disk, so documents reset on restart or redeploy. https://docs-app-732u.onrender.com/
+Live at https://docs-app-732u.onrender.com/ (Render, free tier, Docker). The `Dockerfile` also works on Fly.io or Railway. Render's free tier has no persistent disk, so documents reset on restart or redeploy; mount a volume at `/data` to keep the SQLite file.
 

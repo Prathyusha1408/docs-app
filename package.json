@@ -1,16 +1,15 @@
 {
   "name": "docs-app",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "test": "node --test", "start": "node server.js"
-  },
+  "description": "Drafts: a lightweight collaborative document editor",
+  "main": "server.js",
   "scripts": {
-    "test": "node --test", "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
-  "keywords": [],
-  "author": "",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "license": "ISC",
   "dependencies": {
     "express": "^5.3.0",
