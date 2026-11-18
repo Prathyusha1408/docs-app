@@ -1,11 +1,11 @@
 # Drafts: a lightweight collaborative document editor
 
-Node 22 + Express + SQLite (`node:sqlite`, no native build) with a dependency-free browser UI.
+Node 22.12+ + Express + SQLite (`node:sqlite`, no native build) with a dependency-free browser UI.
 
 ## Run locally
 ```
 npm install
-npm start        # http://localhost:3000
+npm start        # http://localhost:3456
 npm test         # 4 automated API tests (node:test)
 ```
 Docker: `docker build -t drafts . && docker run -p 3000:3000 -v drafts:/data drafts`
